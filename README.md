@@ -8,7 +8,7 @@ The FRU PAQX service implements a VxRack FLEX Field Replacement Unit (FRU) workf
 
 ## Documentation
 
-The documentation is hosted at http://dellemc-symphony.readthedocs.io/.
+You can find additional documentation for Project Symphony at [dellemc-symphony.readthedocs.io][documentation].
 
 ## API overview
 
@@ -87,9 +87,9 @@ Execute the rackhd-endpoint API call (shown in the href value above) with a POST
 
 ```
 {
-  "endpointUrl": "http://10.10.10.10:8080",
-  "username": "admin",
-  "password": "admin"
+  "endpointUrl": "http://<ip-address>:<port>",
+  "username": "<username>",
+  "password": "<password>"
 }
 
 ```
