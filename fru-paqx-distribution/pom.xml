@@ -46,7 +46,7 @@
         <dependency>
             <groupId>com.dell.cpsd.paqx.fru</groupId>
             <artifactId>fru-paqx</artifactId>
-            <version>${parent.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
     </dependencies>
 
@@ -68,7 +68,7 @@
                                 <artifactItem>
                                     <groupId>com.dell.cpsd.paqx.fru</groupId>
                                     <artifactId>fru-paqx</artifactId>
-                                    <version>${parent.version}</version>
+                                    <version>${project.parent.version}</version>
                                 </artifactItem>
                             </artifactItems>
                             <outputDirectory>${project.build.directory}/dependency/lib</outputDirectory>
