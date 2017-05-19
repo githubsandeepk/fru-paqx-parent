@@ -35,7 +35,7 @@ pipeline {
         }
         stage('Integration Test') {
             steps {
-                sh "docker exec fru-paqx-test-${COMPOSE_PROJECT_NAME} mvn clean verify -DskipDocker=true"
+                sh "docker exec fru-paqx-test-${COMPOSE_PROJECT_NAME} mvn verify -DskipDocker=true -pl fru-paqx"
             }
         }
 	    stage('Package') {

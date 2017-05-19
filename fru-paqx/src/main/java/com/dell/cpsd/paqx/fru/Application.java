@@ -33,7 +33,7 @@ public class Application extends SpringBootServletInitializer
         try
         {
             System.out.println("WE ARE HERE!!");
-            Server webServer = Server.createWebServer("-web","-webAllowOthers","-webPort","8082").start();
+            Server webServer = Server.createWebServer("-web","-webAllowOthers","-webPort","8085").start();
             Server server = Server.createTcpServer().start();//("-web","-webAllowOthers","-webPort","9092").start();
             //Server webServer = Server.createWebServer("-web,-trace").start();
             //Server server = Server.createTcpServer("-tcp,-tcpAllowOthers,true,-tcpPort,9092").start();
