@@ -11,6 +11,7 @@ import com.dell.cpsd.paqx.fru.domain.Datacenter;
 import com.dell.cpsd.paqx.fru.domain.Datastore;
 import com.dell.cpsd.paqx.fru.domain.HostDnsConfig;
 import com.dell.cpsd.paqx.fru.domain.HostIpRouteConfig;
+import com.dell.cpsd.paqx.fru.domain.PhysicalNic;
 import com.dell.cpsd.paqx.fru.domain.VirtualMachine;
 import com.dell.cpsd.virtualization.capabilities.api.*;
 import com.dell.cpsd.virtualization.capabilities.api.Network;
@@ -205,6 +206,22 @@ public class DiscoveryInfoToVCenterDomainTransformer {
                         .collect(Collectors.toList());
                 returnVal.setvSwitchList(vSwitches);
             }
+
+            if (hostSystem.getHostConfigInfo().getHostNetworkInfo().getVnics()!=null)
+            {
+                // Transform and link VirtualNics
+                List<VirtualNic> virtualNics = hostSystem.getHostConfigInfo().getHostNetworkInfo().getVnics().stream().filter(Objects::nonNull).map(hostVirtualNic -> transformHostVirtualNic(hostVirtualNic, returnVal))
+                        .collect(Collectors.toList());
+                returnVal.setVirtualNicList(virtualNics);
+            }
+
+            if (hostSystem.getHostConfigInfo().getHostNetworkInfo().getPnics()!=null)
+            {
+                // Transform and link VirtualNics
+                List<PhysicalNic> physicalNics = hostSystem.getHostConfigInfo().getHostNetworkInfo().getPnics().stream().filter(Objects::nonNull).map(physicalNic -> transformHostPhysicalNic(physicalNic, returnVal))
+                        .collect(Collectors.toList());
+                returnVal.setPhysicalNicList(physicalNics);
+            }
         }
 
         // One to Many Link to VMs
@@ -271,6 +288,43 @@ public class DiscoveryInfoToVCenterDomainTransformer {
         return returnVal;
     }
 
+    private VirtualNic transformHostVirtualNic(HostVirtualNic virtualNic, Host host)
+    {
+        if (virtualNic == null){
+            return null;
+        }
+        VirtualNic returnVal = new VirtualNic();
+        returnVal.setDevice(virtualNic.getDevice());
+        returnVal.setPort(virtualNic.getPort());
+        returnVal.setPortGroup(virtualNic.getPortGroup());
+        returnVal.setMac(virtualNic.getHostVirtualNicSpec().getMac());
+        returnVal.setDhcp(virtualNic.getHostVirtualNicSpec().getHostIpConfig().getDhcp());
+        returnVal.setIp(virtualNic.getHostVirtualNicSpec().getHostIpConfig().getIpAddress());
+        returnVal.setSubnetMask(virtualNic.getHostVirtualNicSpec().getHostIpConfig().getSubnetMask());
+
+        // FK link
+        returnVal.setHost(host);
+
+        return returnVal;
+    }
+
+    private PhysicalNic transformHostPhysicalNic(com.dell.cpsd.virtualization.capabilities.api.PhysicalNic physicalNic, Host host)
+    {
+        if (physicalNic == null){
+            return null;
+        }
+        PhysicalNic returnVal = new PhysicalNic();
+        returnVal.setDevice(physicalNic.getDevice());
+        returnVal.setDriver(physicalNic.getDriver());
+        returnVal.setPci(physicalNic.getPci());
+        returnVal.setMac(physicalNic.getMac());
+
+        // FK link
+        returnVal.setHost(host);
+
+        return returnVal;
+    }
+
     private VirtualMachine transformVirtualMachine(com.dell.cpsd.virtualization.capabilities.api.VirtualMachine virtualMachine)
     {
         if (virtualMachine == null){
@@ -309,6 +363,7 @@ public class DiscoveryInfoToVCenterDomainTransformer {
 
         // FK link
         returnVal.setVirtualMachine(virtualMachine);
+
         return returnVal;
     }
 
@@ -321,6 +376,7 @@ public class DiscoveryInfoToVCenterDomainTransformer {
 
         // FK link
         returnVal.setVmNetwork(vmNetwork);
+
         return returnVal;
     }
 
