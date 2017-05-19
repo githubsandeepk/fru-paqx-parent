@@ -62,6 +62,10 @@ public class ScaleIOMdmCluster
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "mdmCluster", orphanRemoval = true)
     List<ScaleIOSDSElementInfo> masterElementInfo = new ArrayList<>();
 
+    public ScaleIOMdmCluster()
+    {
+    }
+
     public ScaleIOMdmCluster(final String id8, final String clusterName, final String clusterState, final String clusterMode, final int i,
             final int i1)
     {

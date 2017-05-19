@@ -16,9 +16,11 @@ import javax.persistence.Entity;
 @DiscriminatorValue("SECONDARY")
 public class ScaleIOSecondaryMDMIP extends ScaleIOIP
 {
-
+    public ScaleIOSecondaryMDMIP()
+    {
+    }
     public ScaleIOSecondaryMDMIP(final String id, final String ip)
     {
-        super(id, ip);
+        super(ip);
     }
 }

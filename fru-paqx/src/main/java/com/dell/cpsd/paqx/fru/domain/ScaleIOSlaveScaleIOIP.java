@@ -16,9 +16,11 @@ import javax.persistence.Entity;
 @DiscriminatorValue("SLAVE")
 public class ScaleIOSlaveScaleIOIP extends ScaleIOIP
 {
-
+    public ScaleIOSlaveScaleIOIP()
+    {
+    }
     public ScaleIOSlaveScaleIOIP(final String id2, final String s)
     {
-        super(id2, s);
+        super(s);
     }
 }

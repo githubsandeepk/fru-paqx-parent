@@ -60,6 +60,9 @@ public class ScaleIOSDS
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, mappedBy = "sds")
     private List<ScaleIODevice> devices = new ArrayList<>();
 
+    public ScaleIOSDS()
+    {
+    }
     public ScaleIOSDS(final String id, final String name, final String sdsState, final int port)
     {
         this.id = id;

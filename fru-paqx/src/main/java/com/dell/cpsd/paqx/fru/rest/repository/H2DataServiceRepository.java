@@ -71,6 +71,7 @@ public class H2DataServiceRepository implements DataServiceRepository
             fruJob.setScaleIO(data);
             entityManager.merge(fruJob);
         }
+        entityManager.flush();
         return fruJob.getUuid();
     }
 

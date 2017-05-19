@@ -53,6 +53,11 @@ public class ScaleIOProtectionDomain
     @ManyToOne(cascade = CascadeType.ALL)
     private ScaleIOData scaleIOData;
 
+    public ScaleIOProtectionDomain()
+    {
+
+    }
+
     public ScaleIOProtectionDomain(final String id, final String protectionDomainName, final String state)
     {
         this.id = id;

@@ -29,13 +29,13 @@ public class ScaleIODevice
     @Column(name = "DEVICE_UUID", unique = true, nullable = false)
     private Long uuid;
 
-    @Column(name = "DEVICE_ID")
+    @Column(name = "DEVICE_ID", unique=true, nullable=false)
     private String id;
 
-    @Column(name = "DEVICE_NAME", unique = true, nullable = false)
+    @Column(name = "DEVICE_NAME")
     private String name;
 
-    @Column(name = "DEVICE_CURRENT_PATH_NAME", unique = true, nullable = false)
+    @Column(name = "DEVICE_CURRENT_PATH_NAME")
     private String deviceCurrentPathName;
 
     @ManyToOne(cascade = CascadeType.ALL)
@@ -43,6 +43,11 @@ public class ScaleIODevice
 
     @ManyToOne(cascade = CascadeType.ALL)
     private ScaleIOSDS sds;
+
+    public ScaleIODevice()
+    {
+
+    }
 
     public ScaleIODevice(final String id, final String scaleIOName, final String deviceCurrentPathName)
     {

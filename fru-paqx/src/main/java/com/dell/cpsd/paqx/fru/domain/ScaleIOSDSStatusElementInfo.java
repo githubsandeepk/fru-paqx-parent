@@ -20,6 +20,10 @@ public abstract class ScaleIOSDSStatusElementInfo extends ScaleIOSDSElementInfo
     @Column(name = "SDS_ELEMENT_STATUS")
     private String status;
 
+    public ScaleIOSDSStatusElementInfo()
+    {
+    }
+
     public ScaleIOSDSStatusElementInfo(final String id9, final int i, final String version1, final String slave, final String s,
             final String s1)
     {

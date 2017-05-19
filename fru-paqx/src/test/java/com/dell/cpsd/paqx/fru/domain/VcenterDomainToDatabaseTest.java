@@ -9,28 +9,54 @@ import com.dell.cpsd.paqx.fru.amqp.config.*;
 import com.dell.cpsd.paqx.fru.amqp.config.PersistenceConfig;
 import com.dell.cpsd.paqx.fru.amqp.config.PersistencePropertiesConfig;
 import com.dell.cpsd.paqx.fru.rest.repository.DataServiceRepository;
+import com.dell.cpsd.paqx.fru.transformers.DiscoveryInfoToVCenterDomainTransformer;
+import com.dell.cpsd.paqx.fru.transformers.ScaleIORestToScaleIODomainTransformer;
+import com.dell.cpsd.storage.capabilities.api.ListStorageResponseMessage;
+import com.dell.cpsd.storage.capabilities.api.ScaleIOSystemDataRestRep;
+import com.dell.cpsd.virtualization.capabilities.api.DiscoveryResponseInfoMessage;
+import org.apache.commons.io.IOUtils;
+import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.annotation.Commit;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import javax.persistence.EntityManager;
+import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
+@ActiveProfiles({"UnitTest"})
 @RunWith(SpringRunner.class)
-@Import({ConsumerConfig.class, ContextConfig.class, PersistenceConfig.class, PersistencePropertiesConfig.class, ProducerConfig.class, ProductionConfig.class, PropertiesConfig.class, RabbitConfig.class})
+@Import({ConsumerConfig.class, ContextConfig.class, PersistenceConfig.class, PersistencePropertiesConfig.class, ProducerConfig.class,
+        ProductionConfig.class, PropertiesConfig.class, RabbitConfig.class, TestConfig.class})
 @DataJpaTest
 public class VcenterDomainToDatabaseTest
 {
+    private RabbitConfig     config;
+    private MessageConverter converter;
+
+    @Autowired
+    @Qualifier("test")
+    DataServiceRepository repository;
+
     private static int idCount=0;
     private static int clusterCount=2;
     private static int hostCount=5;
@@ -38,21 +64,13 @@ public class VcenterDomainToDatabaseTest
     @Autowired
     TestEntityManager testEntityManager;
 
-/*    @Test
-    public void testvCenterDomain() throws Exception {
-        VCenter data = createDataObject();
+    @Before
+    public void setUp()
+    {
+        config = new RabbitConfig();
+        converter = config.messageConverter();
 
-        UUID randomUUID = UUID.randomUUID();
-        Long databaseJobUUID = repository.saveVCenterData(randomUUID, data);
-
-        FruJob job = testEntityManager.find(FruJob.class, databaseJobUUID);
-        VCenter vcenterData = job.getVcenter();
-
-        VCenter actualScaleIOData = testEntityManager.find(VCenter.class, vcenterData.getUuid());
-
-        compareDataModels(data, vcenterData);
-        compareDataModels(data, actualScaleIOData);
-    }*/
+    }
 
     @Test
     public void createDataObject() throws Exception
@@ -101,9 +119,6 @@ public class VcenterDomainToDatabaseTest
         clusterQuery = testEntityManager.find(Cluster.class, 2l);
         assertTrue(clusterQuery.getDatacenter().equals(dc));
         assertTrue(clusterQuery.equals(clusterList.get(1)));
-
-
-//      dcQuery = testEntityManager.find(Datacenter.class,1l);
 
         // Add datastores to datacenter
         Datastore ds1 = new Datastore(newId(), "ds-01","VMFS", "/im/a/fake/url1");
@@ -156,23 +171,80 @@ public class VcenterDomainToDatabaseTest
         // Validate dc mapped to dvswitches
         dcQuery = testEntityManager.find(Datacenter.class, 1l);
         assertTrue(dcQuery.getDvSwitchList().containsAll(dvSwitches));
+    }
 
-//
-//        // Add hosts to clusters
-//        Host host1 = new Host(newId(), "host-01","POWERED_ON", cluster1);
-//        Host host2 = new Host(newId(), "host-02","POWERED_ON", cluster1);
-//        Host host3 = new Host(newId(), "host-03","POWERED_ON", cluster1);
-//        List<Host> cluster1HostList = Arrays.asList(host1, host2, host3);
-//
-//        cluster1.setHostList(cluster1HostList);
-//
-//        Host host4 = new Host(newId(), "host-04","POWERED_ON", cluster2);
-//        Host host5 = new Host(newId(), "host-05","POWERED_ON", cluster2);
-//
-//        List<Host> cluster2HostList = Arrays.asList(host4, host5);
-//
-//        cluster2.setHostList(cluster2HostList);
+    @Test
+    public void vCenterDiscoveryTest() throws Exception
+    {
+        final Message message = jsonMessage("com.dell.cpsd.vcenter.discoveryResponseInfo", "src/test/resources/vcenterResponseDiscoveryPayload.json");
+        final DiscoveryResponseInfoMessage entity = (DiscoveryResponseInfoMessage) converter.fromMessage(message);
 
+        assertNotNull(entity);
+        assertNotNull(entity.getMessageProperties());
+        assertEquals("c72445b6-5681-4669-b12f-22eb577b0217", entity.getMessageProperties().getCorrelationId());
+        DiscoveryInfoToVCenterDomainTransformer transformer = new DiscoveryInfoToVCenterDomainTransformer();
+
+        final VCenter domainObject = transformer.transform(entity);
+        Assert.assertTrue(domainObject!=null);
+
+        UUID randomUUID = UUID.randomUUID();
+        Long databaseJobUUID = repository.saveVCenterData(randomUUID, domainObject);
+
+        FruJob job = testEntityManager.find(FruJob.class, databaseJobUUID);
+        VCenter vcenterData = job.getVcenter();
+        assertTrue(vcenterData!=null);
+        compareDataModels(domainObject, vcenterData);
+    }
+
+    @Test
+    public void testPersistVCenterAndScaleIOObjects() throws Exception
+    {
+        final Message messageV = jsonMessage("com.dell.cpsd.vcenter.discoveryResponseInfo",
+                "src/test/resources/vcenterResponseDiscoveryPayload.json");
+        final DiscoveryResponseInfoMessage entityV = (DiscoveryResponseInfoMessage) converter.fromMessage(messageV);
+
+        assertNotNull(entityV);
+        assertNotNull(entityV.getMessageProperties());
+        assertEquals("c72445b6-5681-4669-b12f-22eb577b0217", entityV.getMessageProperties().getCorrelationId());
+        DiscoveryInfoToVCenterDomainTransformer transformerV = new DiscoveryInfoToVCenterDomainTransformer();
+
+        final VCenter domainObjectV = transformerV.transform(entityV);
+        Assert.assertTrue(domainObjectV != null);
+
+        UUID randomUUIDV = UUID.randomUUID();
+        Long databaseJobUUIDV = repository.saveVCenterData(randomUUIDV, domainObjectV);
+
+        FruJob jobV = testEntityManager.find(FruJob.class, databaseJobUUIDV);
+        VCenter vcenterData = jobV.getVcenter();
+        assertTrue(vcenterData != null);
+        compareDataModels(domainObjectV, vcenterData);
+
+        //Save scaleIO
+        final Message message = jsonMessage("com.dell.cpsd.list.storage.response", "src/test/resources/scaleIODiscoveryResponsePayload.json");
+        final ListStorageResponseMessage entity = (ListStorageResponseMessage) converter.fromMessage(message);
+        ScaleIOSystemDataRestRep rep = entity.getScaleIOSystemDataRestRep();
+
+        ScaleIORestToScaleIODomainTransformer transformer = new ScaleIORestToScaleIODomainTransformer();
+
+        final ScaleIOData domainObject = transformer.transform(rep);
+        Assert.assertTrue(domainObject != null);
+
+        Long databaseJobUUID = repository.saveScaleIOData(randomUUIDV, domainObject);
+
+        FruJob job = testEntityManager.find(FruJob.class, databaseJobUUID);
+        ScaleIOData scaleIOData = job.getScaleIO();
+        assertTrue(scaleIOData != null);
+    }
+
+    private Message jsonMessage(String typeId, String contentFileName) throws Exception
+    {
+        MessageProperties properties = new MessageProperties();
+        properties.setContentType("application/json");
+        properties.setHeader("__TypeId__", typeId);
+
+        String content = IOUtils.toString(new FileInputStream(new File(contentFileName)));
+
+        return new Message(content.getBytes(), properties);
     }
 
     private void compareDataModels(final VCenter data, final VCenter data2)
@@ -190,4 +262,3 @@ public class VcenterDomainToDatabaseTest
         return new String(baseName+"-"+(idCount++));
     }
 }
-

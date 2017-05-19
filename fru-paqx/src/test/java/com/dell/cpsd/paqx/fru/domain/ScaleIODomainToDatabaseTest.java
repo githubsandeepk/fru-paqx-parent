@@ -15,19 +15,27 @@ import com.dell.cpsd.paqx.fru.amqp.config.PropertiesConfig;
 import com.dell.cpsd.paqx.fru.amqp.config.RabbitConfig;
 import com.dell.cpsd.paqx.fru.amqp.config.TestConfig;
 import com.dell.cpsd.paqx.fru.rest.repository.DataServiceRepository;
+import com.dell.cpsd.paqx.fru.transformers.ScaleIORestToScaleIODomainTransformer;
+import com.dell.cpsd.storage.capabilities.api.ListStorageResponseMessage;
+import com.dell.cpsd.storage.capabilities.api.ScaleIOSystemDataRestRep;
+import org.apache.commons.io.IOUtils;
+import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Profile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -43,9 +51,19 @@ import static junit.framework.TestCase.assertTrue;
 @Import({ConsumerConfig.class, ContextConfig.class, PersistenceConfig.class, PersistencePropertiesConfig.class, ProducerConfig.class,
         ProductionConfig.class, PropertiesConfig.class, RabbitConfig.class, TestConfig.class})
 @DataJpaTest
-
 public class ScaleIODomainToDatabaseTest
 {
+    private RabbitConfig     config;
+    private     MessageConverter converter;
+
+    @Before
+    public void setUp()
+    {
+        config = new RabbitConfig();
+        converter = config.messageConverter();
+
+    }
+
     private static int idCount = 0;
 
     @Autowired
@@ -54,6 +72,38 @@ public class ScaleIODomainToDatabaseTest
 
     @Autowired
     TestEntityManager testEntityManager;
+
+    @Test
+    public void testRealObject() throws Exception
+    {
+        final Message message = jsonMessage("com.dell.cpsd.list.storage.response", "src/test/resources/scaleIODiscoveryResponsePayload.json");
+        final ListStorageResponseMessage entity = (ListStorageResponseMessage) converter.fromMessage(message);
+        ScaleIOSystemDataRestRep rep=entity.getScaleIOSystemDataRestRep();
+
+        ScaleIORestToScaleIODomainTransformer transformer = new ScaleIORestToScaleIODomainTransformer();
+
+        final ScaleIOData domainObject = transformer.transform(rep);
+        Assert.assertTrue(domainObject!=null);
+
+        UUID randomUUID = UUID.randomUUID();
+        Long databaseJobUUID = repository.saveScaleIOData(randomUUID, domainObject);
+
+        FruJob job = testEntityManager.find(FruJob.class, databaseJobUUID);
+        ScaleIOData scaleIOData = job.getScaleIO();
+        assertTrue(scaleIOData!=null);
+        compareDataModels(domainObject, scaleIOData);
+    }
+
+    public Message jsonMessage(String typeId, String contentFileName) throws Exception
+    {
+        MessageProperties properties = new MessageProperties();
+        properties.setContentType("application/json");
+        properties.setHeader("__TypeId__", typeId);
+
+        String content = IOUtils.toString(new FileInputStream(new File(contentFileName)));
+
+        return new Message(content.getBytes(), properties);
+    }
 
     @Test
     public void testRepositoryPersistAndRead() throws Exception

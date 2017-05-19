@@ -16,9 +16,12 @@ import javax.persistence.Entity;
 @DiscriminatorValue("PRIMARY")
 public class ScaleIOPrimaryMDMIP extends ScaleIOIP
 {
+    public ScaleIOPrimaryMDMIP()
+    {
 
+    }
     public ScaleIOPrimaryMDMIP(final String id4, final String s)
     {
-        super(id4, s);
+        super(s);
     }
 }

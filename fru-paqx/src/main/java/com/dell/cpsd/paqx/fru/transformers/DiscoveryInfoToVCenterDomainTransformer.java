@@ -15,6 +15,7 @@ import com.dell.cpsd.paqx.fru.domain.VirtualMachine;
 import com.dell.cpsd.virtualization.capabilities.api.*;
 import com.dell.cpsd.virtualization.capabilities.api.Network;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -52,32 +53,37 @@ public class DiscoveryInfoToVCenterDomainTransformer {
         returnVal.setId(datacenter.getId());
         returnVal.setName(datacenter.getName());
 
-        // Transform vms
-        List<VirtualMachine> virtualMachines = datacenter.getVms()
-                .stream().filter(Objects::nonNull)
-                .map(virtualMachine -> transformVirtualMachine(virtualMachine))
-                .collect(Collectors.toList());
+        final List<VirtualMachine> virtualMachines=new ArrayList<>();
+        if (datacenter.getVms()!=null && datacenter.getVms().values()!=null)
+        {
+            // Transform vms
+            virtualMachines.addAll(datacenter.getVms().values().stream().filter(Objects::nonNull).map(virtualMachine -> transformVirtualMachine(virtualMachine)).collect(Collectors.toList()));
 
-        // Transform and link datastores
-        List<Datastore> datastores = datacenter.getDatastores()
-                .stream().filter(Objects::nonNull)
-                .map(datastore -> transformDatastore(datastore, returnVal, virtualMachines))
-                .collect(Collectors.toList());
-        returnVal.setDatastoreList(datastores);
+        }
+
+        if (datacenter.getDatastores()!=null && datacenter.getDatastores().values()!=null)
+        {
+            // Transform and link datastores
+            List<Datastore> datastores = datacenter.getDatastores().values().stream().filter(Objects::nonNull)
+                    .map(datastore -> transformDatastore(datastore, returnVal, virtualMachines)).collect(Collectors.toList());
+            returnVal.setDatastoreList(datastores);
+        }
+
 
         // Transform and link dvswitches
-        List<DVSwitch> dvSwitches = datacenter.getDvSwitches()
-                .stream().filter(Objects::nonNull)
-                .map(dvSwitch -> transformDVSwitch(dvSwitch, returnVal))
-                .collect(Collectors.toList());
-        returnVal.setDvSwitchList(dvSwitches);
-
-        // Transform and link clusters
-        List<Cluster> clusters = datacenter.getClusters()
-                .stream().filter(Objects::nonNull)
-                .map(cluster -> transformCluster(cluster, returnVal, virtualMachines))
-                .collect(Collectors.toList());
-        returnVal.setClusterList(clusters);
+        if (datacenter.getDvSwitches()!=null && datacenter.getDvSwitches().values()!=null)
+        {
+            List<DVSwitch> dvSwitches = datacenter.getDvSwitches().values().stream().filter(Objects::nonNull)
+                    .map(dvSwitch -> transformDVSwitch(dvSwitch, returnVal)).collect(Collectors.toList());
+            returnVal.setDvSwitchList(dvSwitches);
+        }
+        if (datacenter.getClusters()!=null && datacenter.getClusters().values()!=null)
+        {
+            // Transform and link clusters
+            List<Cluster> clusters = datacenter.getClusters().values().stream().filter(Objects::nonNull)
+                    .map(cluster -> transformCluster(cluster, returnVal, virtualMachines)).collect(Collectors.toList());
+            returnVal.setClusterList(clusters);
+        }
 
         // TODO: Link Host Pnics to Dvswitches
         // TODO: Link Datastores to Hosts
@@ -154,10 +160,12 @@ public class DiscoveryInfoToVCenterDomainTransformer {
         returnVal.setName(cluster.getName());
 
         // Transform and link hosts
-        List<Host> hosts = cluster.getHosts()
-                .stream().filter(Objects::nonNull)
-                .map(hostSystem -> transformHost(hostSystem, returnVal, virtualMachines)).collect(Collectors.toList());
-        returnVal.setHostList(hosts);
+        if (cluster.getHosts()!=null && cluster.getHosts().values()!=null)
+        {
+            List<Host> hosts = cluster.getHosts().values().stream().filter(Objects::nonNull)
+                    .map(hostSystem -> transformHost(hostSystem, returnVal, virtualMachines)).collect(Collectors.toList());
+            returnVal.setHostList(hosts);
+        }
 
         // FK link
         returnVal.setDatacenter(datacenter);
@@ -179,18 +187,25 @@ public class DiscoveryInfoToVCenterDomainTransformer {
         //returnVal.setSerialNumber(hostSystem.getSerialNumber());
 
         // Transform and link HostDnsConfig
-        HostDnsConfig hostDnsConfig = transformHostDnsConfig(hostSystem.getHostConfigInfo().getHostNetworkInfo().getHostDnsConfig(), returnVal);
-        returnVal.setHostDnsConfig(hostDnsConfig);
 
-        // Transform and link HostIpRouteConfig
-        HostIpRouteConfig hostIpRouteConfig = transformHostIpRouteConfig(hostSystem.getHostConfigInfo().getHostNetworkInfo().getHostIpRouteConfig(), returnVal);
-        returnVal.setHostIpRouteConfig(hostIpRouteConfig);
+        if (hostSystem.getHostConfigInfo()!=null && hostSystem.getHostConfigInfo().getHostNetworkInfo()!=null)
+        {
+            HostDnsConfig hostDnsConfig = transformHostDnsConfig(hostSystem.getHostConfigInfo().getHostNetworkInfo().getHostDnsConfig(), returnVal);
 
-        // Transform and link HostVirtualSwitch
-        List<VSwitch> vSwitches = hostSystem.getHostConfigInfo().getHostNetworkInfo().getVswitchs()
-                .stream().filter(Objects::nonNull)
-                .map(hostVirtualSwitch -> transformVSwitch(hostVirtualSwitch, returnVal)).collect(Collectors.toList());
-        returnVal.setvSwitchList(vSwitches);
+            returnVal.setHostDnsConfig(hostDnsConfig);
+
+            // Transform and link HostIpRouteConfig
+            HostIpRouteConfig hostIpRouteConfig = transformHostIpRouteConfig(hostSystem.getHostConfigInfo().getHostNetworkInfo().getHostIpRouteConfig(), returnVal);
+            returnVal.setHostIpRouteConfig(hostIpRouteConfig);
+
+            if (hostSystem.getHostConfigInfo().getHostNetworkInfo().getVswitchs()!=null)
+            {
+                // Transform and link HostVirtualSwitch
+                List<VSwitch> vSwitches = hostSystem.getHostConfigInfo().getHostNetworkInfo().getVswitchs().stream().filter(Objects::nonNull).map(hostVirtualSwitch -> transformVSwitch(hostVirtualSwitch, returnVal))
+                        .collect(Collectors.toList());
+                returnVal.setvSwitchList(vSwitches);
+            }
+        }
 
         // One to Many Link to VMs
         List<VirtualMachine> vmsOnHost = virtualMachines.stream()

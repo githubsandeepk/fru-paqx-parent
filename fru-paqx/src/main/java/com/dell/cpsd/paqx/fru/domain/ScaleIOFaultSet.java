@@ -45,6 +45,11 @@ public class ScaleIOFaultSet
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "faultSet", orphanRemoval = true)
     private List<ScaleIOSDS> sdsList = new ArrayList<>();
 
+    public ScaleIOFaultSet()
+    {
+
+    }
+
     public ScaleIOFaultSet(final String id, final String faultSetName)
     {
         this.id = id;

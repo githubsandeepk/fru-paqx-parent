@@ -78,6 +78,11 @@ public class ScaleIOData
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "scaleIOData", orphanRemoval = true)
     List<ScaleIOProtectionDomain> protectionDomains = new ArrayList<>();
 
+    public ScaleIOData()
+    {
+
+    }
+
     public ScaleIOData(final String id1, final String scaleIODataName, final String scaleIODataInstallID, final String mdmMode,
             final String systemVersionName, final String mdmClusterState, final String version)
     {

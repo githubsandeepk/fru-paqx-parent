@@ -35,9 +35,6 @@ public abstract class ScaleIOIP
     @Column(name = "IP_UUID", unique = true, nullable = false)
     private Long uuid;
 
-    @Column(name = "IP_ID", unique = true, nullable = false)
-    private String id;
-
     @Column(name = "IP")
     private String ip;
 
@@ -47,9 +44,13 @@ public abstract class ScaleIOIP
     @ManyToOne(cascade = CascadeType.ALL)
     public ScaleIOSDSElementInfo sdsElementInfo;
 
-    public ScaleIOIP(final String id, final String ip)
+    public ScaleIOIP()
     {
-        this.id = id;
+
+    }
+
+    public ScaleIOIP(final String ip)
+    {
         this.ip = ip;
     }
 
@@ -61,16 +62,6 @@ public abstract class ScaleIOIP
     public void setUuid(final Long uuid)
     {
         this.uuid = uuid;
-    }
-
-    public String getId()
-    {
-        return id;
-    }
-
-    public void setId(final String id)
-    {
-        this.id = id;
     }
 
     public String getIp()
@@ -96,7 +87,7 @@ public abstract class ScaleIOIP
     @Override
     public int hashCode()
     {
-        return new HashCodeBuilder().append(uuid).append(id).append(ip).toHashCode();
+        return new HashCodeBuilder().append(uuid).append(ip).toHashCode();
     }
 
     /**
@@ -120,7 +111,7 @@ public abstract class ScaleIOIP
         }
         //Toot stands for "That Object Over There"
         ScaleIOIP toot = ((ScaleIOIP) other);
-        return new EqualsBuilder().append(uuid, toot.uuid).append(id, toot.id).append(ip, toot.ip).isEquals();
+        return new EqualsBuilder().append(uuid, toot.uuid).append(ip, toot.ip).isEquals();
     }
 
     public void setScaleIOSDSElementInfo(final ScaleIOSDSElementInfo sdsElementInfo)

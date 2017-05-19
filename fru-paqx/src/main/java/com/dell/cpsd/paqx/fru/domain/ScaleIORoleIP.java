@@ -39,6 +39,10 @@ public class ScaleIORoleIP
     @ManyToOne(cascade = CascadeType.ALL)
     private ScaleIOSDS sds;
 
+    public ScaleIORoleIP()
+    {
+    }
+
     public ScaleIORoleIP(final String role, final String ip)
     {
         this.role = role;

@@ -14,7 +14,7 @@ public class VSwitch {
     @Column(name = "UUID", unique = true, nullable = false)
     private Long uuid;
 
-    @Column(name = "VSWITCH_ID", unique=true, nullable=false)
+    @Column(name = "VSWITCH_ID", nullable=false)
     private String id;
 
     @Column(name = "VSWITCH_NAME")

@@ -16,6 +16,10 @@ import javax.persistence.Entity;
 @DiscriminatorValue("ELEMENT_MASTER")
 public class ScaleIOMasterElementInfo extends ScaleIOSDSElementInfo
 {
+    public ScaleIOMasterElementInfo()
+    {
+        super();
+    }
     public ScaleIOMasterElementInfo(final String id, final int port, final String versionInfo, final String name, final String role)
     {
         super(id, port, versionInfo, name, role);

@@ -70,6 +70,11 @@ public abstract class ScaleIOSDSElementInfo
         this.role = role;
     }
 
+    public ScaleIOSDSElementInfo()
+    {
+
+    }
+
     public Long getUuid()
     {
         return uuid;

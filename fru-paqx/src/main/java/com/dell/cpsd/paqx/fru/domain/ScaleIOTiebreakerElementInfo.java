@@ -16,6 +16,9 @@ import javax.persistence.Entity;
 @DiscriminatorValue("ELEMENT_TIEBREAKER")
 public class ScaleIOTiebreakerElementInfo extends ScaleIOSDSStatusElementInfo
 {
+    public ScaleIOTiebreakerElementInfo()
+    {
+    }
     public ScaleIOTiebreakerElementInfo(final String id9, final int i, final String version1, final String slave, final String s,
             final String s1)
     {

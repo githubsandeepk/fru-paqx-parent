@@ -54,6 +54,10 @@ public class ScaleIOStoragePool
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "storagePool", orphanRemoval = true)
     private List<ScaleIODevice> devices = new ArrayList<>();
 
+    public ScaleIOStoragePool()
+    {
+    }
+
     public ScaleIOStoragePool(final String id, final String storagePoolName, final int capacityAvailableForVolumeAllocationInKb,
             final int maxCapacityInKb, final int numOfVolumes)
     {

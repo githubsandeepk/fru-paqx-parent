@@ -47,6 +47,10 @@ public class ScaleIOSDC
     @ManyToOne(cascade = CascadeType.ALL)
     private ScaleIOData scaleIOData;
 
+    public ScaleIOSDC()
+    {
+    }
+
     public ScaleIOSDC(final String id, final String name, final String sdcIp, final String sdcGuid, final String mdmConnectorState)
     {
         this.id=id;

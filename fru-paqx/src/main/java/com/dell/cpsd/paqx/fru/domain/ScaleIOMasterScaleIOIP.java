@@ -16,9 +16,12 @@ import javax.persistence.Entity;
 @DiscriminatorValue("MASTER")
 public class ScaleIOMasterScaleIOIP extends com.dell.cpsd.paqx.fru.domain.ScaleIOIP
 {
-
+    public ScaleIOMasterScaleIOIP()
+    {
+        super();
+    }
     public ScaleIOMasterScaleIOIP(final String id2, final String s)
     {
-        super(id2, s);
+        super(s);
     }
 }

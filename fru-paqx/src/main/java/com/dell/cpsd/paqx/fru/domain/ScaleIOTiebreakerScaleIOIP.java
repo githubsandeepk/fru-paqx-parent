@@ -16,9 +16,11 @@ import javax.persistence.Entity;
 @DiscriminatorValue("TIEBREAKER")
 public class ScaleIOTiebreakerScaleIOIP extends ScaleIOIP
 {
-
+    public ScaleIOTiebreakerScaleIOIP()
+    {
+    }
     public ScaleIOTiebreakerScaleIOIP(final String id2, final String s)
     {
-        super(id2, s);
+        super(s);
     }
 }
