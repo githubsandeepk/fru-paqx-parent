@@ -88,8 +88,6 @@ public class ScaleIORestToScaleIODomainTransformerTest
         assertTrue(data.getVersion().equals("version1"));
     }
 
-    // TODO: RESOLVE THIS FILE ISSUE
-    @Ignore
     @Test
     public void testRealObject() throws Exception
     {
