@@ -30,7 +30,7 @@ public interface DataService {
     List<HostRepresentation> getVCenterHosts(String jobId);
 
     SIONodeRemoveRequestMessage getSDSHostsToRemoveFromHostRepresentation(String jobId, HostRepresentation selectedHost,
-            final String scaleIOEndpoint, final String scaleIOPassword, final String scaleIOUserName);
+            final String scaleIOEndpoint, final String mdmPassword, final String mdmUserName);
 
     List<DestroyVMRequestMessage> getDestroyVMRequestMessage(String jobId, HostRepresentation selectedHost, String vCenterEndpoint,
             String vCenterPassword, String vCenterUserName);
