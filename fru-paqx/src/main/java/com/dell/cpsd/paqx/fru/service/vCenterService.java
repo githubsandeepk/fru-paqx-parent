@@ -12,6 +12,7 @@ import com.dell.cpsd.paqx.fru.rest.dto.vCenterSystemProperties;
 import com.dell.cpsd.paqx.fru.rest.dto.vcenter.ClusterOperationResponse;
 import com.dell.cpsd.paqx.fru.rest.dto.vcenter.DestroyVmResponse;
 import com.dell.cpsd.paqx.fru.rest.dto.vcenter.HostMaintenanceModeResponse;
+import com.dell.cpsd.paqx.fru.rest.representation.HostRepresentation;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -27,7 +28,8 @@ public interface vCenterService {
     CompletableFuture<VCenterHostPowerOperationStatus> requestHostPowerOff(final EndpointCredentials vcenterCredentials,
                                                                            final String hostname);
 
-    CompletableFuture<DestroyVmResponse> requestVmDeletion(final EndpointCredentials vcenterCredentials, final String uuid);
+    CompletableFuture<DestroyVmResponse> requestVmDeletion(final EndpointCredentials vcenterCredentials, final String jobId,
+            final HostRepresentation hostRepresentation);
 
     CompletableFuture<HostMaintenanceModeResponse> requestHostMaintenanceModeEnable(EndpointCredentials vcenterCredentials,
                                                                                     String hostname);

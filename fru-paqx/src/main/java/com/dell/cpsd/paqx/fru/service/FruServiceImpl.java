@@ -17,7 +17,6 @@ import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -36,16 +35,14 @@ public class FruServiceImpl implements FruService
     private final ICapabilityRegistryLookupManager capabilityRegistryLookupManager;
     private final AmqpAdmin                        amqpAdmin;
     private final Queue                            responseQueue;
-    private final RabbitTemplate                   rabbitTemplate;
 
     @Autowired
     public FruServiceImpl(final ICapabilityRegistryLookupManager capabilityRegistryLookupManager, final AmqpAdmin amqpAdmin,
-            final Queue responseQueue, final RabbitTemplate rabbitTemplate)
+            final Queue responseQueue)
     {
         this.capabilityRegistryLookupManager = capabilityRegistryLookupManager;
         this.amqpAdmin = amqpAdmin;
         this.responseQueue = responseQueue;
-        this.rabbitTemplate = rabbitTemplate;
     }
 
     @Override
@@ -78,13 +75,6 @@ public class FruServiceImpl implements FruService
         }
     }
 
-//    @Override
-//    public <M> CompletableFuture<M> malformedUrlException(final MalformedURLException e, final CompletableFuture<M> promise)
-//    {
-//        promise.completeExceptionally(e);
-//        return promise;
-//    }
-
     @Override
     public Map<String, String> declareBinding(final Capability capability, final String replyTo)
     {
@@ -99,30 +89,17 @@ public class FruServiceImpl implements FruService
         amqpAdmin.declareBinding(BindingBuilder.bind(responseQueue).to(responseExchange).with(responseRoutingKey));
 
         final String requestAckRoutingKey = amqpProperties.get("request-ack-routing-key");
-        if(requestAckRoutingKey != null)
+        if (requestAckRoutingKey != null)
         {
-            if(!requestAckRoutingKey.isEmpty()) {
+            if (!requestAckRoutingKey.isEmpty())
+            {
                 amqpAdmin.declareBinding(BindingBuilder.bind(responseQueue).to(responseExchange).with(requestAckRoutingKey));
             }
         }
-
 
         LOG.debug("Adding binding {} {}", responseExchange.getName(), responseRoutingKey);
 
         return amqpProperties;
     }
-
-//    @Override
-//    public <M> CompletableFuture<M> registerPromiseAndSendRequestMessage(final AsyncAcknowledgement asyncAcknowledgement,
-//            final String correlationId, final Object message, final Map<String, String> amqpProperties)
-//    {
-//        final CompletableFuture<M> promise = asyncAcknowledgement.register(correlationId);
-//
-//        final String requestExchange = amqpProperties.get("request-exchange");
-//        final String requestRoutingKey = amqpProperties.get("request-routing-key");
-//
-//        rabbitTemplate.convertAndSend(requestExchange, requestRoutingKey, message);
-//        return promise;
-//    }
 }
 
