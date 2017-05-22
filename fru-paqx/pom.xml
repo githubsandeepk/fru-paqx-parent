@@ -161,7 +161,22 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-validation</artifactId>
                 </exclusion>
+                <exclusion>
+                    <artifactId>jersey-bean-validation</artifactId>
+                    <groupId>org.glassfish.jersey.ext</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>bean-validator</artifactId>
+                    <groupId>org.glassfish.hk2.external</groupId>
+                </exclusion>
             </exclusions>
+        </dependency>
+
+        <!--Version 2.5 is omitted in previous exclusion. Instead we used code from 2013.-->
+        <dependency>
+            <groupId>org.glassfish.hk2.external</groupId>
+            <artifactId>bean-validator</artifactId>
+            <version>2.2.0-b10</version>
         </dependency>
 
         <dependency>
