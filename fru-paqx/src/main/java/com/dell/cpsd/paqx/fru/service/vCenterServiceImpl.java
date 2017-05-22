@@ -19,6 +19,7 @@ import com.dell.cpsd.paqx.fru.rest.dto.vCenterSystemProperties;
 import com.dell.cpsd.paqx.fru.rest.dto.vcenter.ClusterOperationResponse;
 import com.dell.cpsd.paqx.fru.rest.dto.vcenter.DestroyVmResponse;
 import com.dell.cpsd.paqx.fru.rest.dto.vcenter.HostMaintenanceModeResponse;
+import com.dell.cpsd.paqx.fru.rest.representation.HostRepresentation;
 import com.dell.cpsd.service.common.client.exception.ServiceTimeoutException;
 import com.dell.cpsd.virtualization.capabilities.api.ClusterOperationRequest;
 import com.dell.cpsd.virtualization.capabilities.api.ClusterOperationRequestMessage;
@@ -73,6 +74,8 @@ public class vCenterServiceImpl implements vCenterService
     private final AsyncAcknowledgement             hostMaintenanceModeAsyncAcknowledgement;
     private final AsyncAcknowledgement             vcenterClusterOperationAsyncAcknowledgement;
     private final String                           replyTo;
+    private final FruService                       fruService;
+    private final DataService                      dataService;
 
     @Autowired
     public vCenterServiceImpl(final ICapabilityRegistryLookupManager capabilityRegistryLookupManager, final RabbitTemplate rabbitTemplate,
@@ -83,7 +86,7 @@ public class vCenterServiceImpl implements vCenterService
             @Qualifier(value = "vCenterHostPowerOperationResponseHandler") final AsyncAcknowledgement vCenterHostPowerAsyncAcknowledgement,
             @Qualifier(value = "vCenterHostMaintenanceModeResponseHandler") final AsyncAcknowledgement hostMaintenanceModeAsyncAcknowledgement,
             @Qualifier(value = "vCenterClusterOperationsResponseHandler") final AsyncAcknowledgement vcenterClusterOperationAsyncAcknowledgement,
-            @Qualifier(value = "replyTo") final String replyTo)
+            @Qualifier(value = "replyTo") final String replyTo, final FruService fruService, final DataService dataService)
     {
         this.capabilityRegistryLookupManager = capabilityRegistryLookupManager;
         this.rabbitTemplate = rabbitTemplate;
@@ -96,11 +99,34 @@ public class vCenterServiceImpl implements vCenterService
         this.hostMaintenanceModeAsyncAcknowledgement = hostMaintenanceModeAsyncAcknowledgement;
         this.vcenterClusterOperationAsyncAcknowledgement = vcenterClusterOperationAsyncAcknowledgement;
         this.replyTo = replyTo;
+        this.fruService = fruService;
+        this.dataService = dataService;
     }
 
     public CompletableFuture<vCenterSystemProperties> showSystem(final EndpointCredentials vcenterCredentials)
     {
         final String requiredCapability = "vcenter-discover";
+
+        try
+        {
+            final List<Capability> matchedCapabilities = fruService.findMatchingCapabilities(requiredCapability);
+            if (matchedCapabilities.isEmpty())
+            {
+                LOG.info("No matching capability found for capability [{}]", requiredCapability);
+                return CompletableFuture.completedFuture(null);
+            }
+            final Capability matchedCapability = matchedCapabilities.stream().findFirst().get();
+            LOG.debug("Found capability {}", matchedCapability.getProfile());
+
+            //TODO: Work in progress
+            final Map<String, String> amqpProperties = fruService.declareBinding(matchedCapability, replyTo);
+            final String correlationID = UUID.randomUUID().toString();
+        }
+        catch (ServiceTimeoutException | CapabilityRegistryException e)
+        {
+            return null;
+        }
+
         try
         {
             final ListCapabilityProvidersResponse listCapabilityProvidersResponse = capabilityRegistryLookupManager
@@ -249,7 +275,8 @@ public class vCenterServiceImpl implements vCenterService
     }
 
     @Override
-    public CompletableFuture<DestroyVmResponse> requestVmDeletion(final EndpointCredentials vcenterCredentials, final String uuid)
+    public CompletableFuture<DestroyVmResponse> requestVmDeletion(final EndpointCredentials vcenterCredentials, final String jobId,
+            final HostRepresentation hostRepresentation)
     {
         final String requiredCapability = "vcenter-destroy-virtualMachine";
 
@@ -281,30 +308,36 @@ public class vCenterServiceImpl implements vCenterService
                         LOG.debug("Adding binding {} {}", responseExchange.getName(), responseRoutingKey);
 
                         final UUID correlationId = UUID.randomUUID();
-                        final DestroyVMRequestMessage requestMessage = new DestroyVMRequestMessage();
-                        requestMessage.setUuid(uuid);
-                        final MessageProperties messageProperties = new MessageProperties(new Date(), correlationId.toString(), replyTo);
-                        requestMessage.setMessageProperties(messageProperties);
-                        requestMessage.setCredentials(new Credentials(vcenterCredentials.getEndpointUrl(), vcenterCredentials.getPassword(),
-                                vcenterCredentials.getUsername()));
 
-                        try
+                        //TODO: Do we need a list. If list, so should we send all of them.
+                        final List<DestroyVMRequestMessage> requestMessages = dataService
+                                .getDestroyVMRequestMessage(jobId, hostRepresentation, vcenterCredentials.getEndpointUrl(),
+                                        vcenterCredentials.getPassword(), vcenterCredentials.getUsername());
+
+                        if (requestMessages != null && !requestMessages.isEmpty())
                         {
-                            new URL(vcenterCredentials.getEndpointUrl());
-                        }
-                        catch (MalformedURLException e)
-                        {
-                            final CompletableFuture<DestroyVmResponse> promise = new CompletableFuture<>();
-                            promise.completeExceptionally(e);
+                            final DestroyVMRequestMessage requestMessage = requestMessages.get(0);
+                            requestMessage.setMessageProperties(new MessageProperties(new Date(), correlationId.toString(), replyTo));
+
+                            try
+                            {
+                                new URL(vcenterCredentials.getEndpointUrl());
+                            }
+                            catch (MalformedURLException e)
+                            {
+                                final CompletableFuture<DestroyVmResponse> promise = new CompletableFuture<>();
+                                promise.completeExceptionally(e);
+                                return promise;
+                            }
+
+                            final CompletableFuture<DestroyVmResponse> promise = vmDeletionAsyncAcknowledgement
+                                    .register(correlationId.toString());
+
+                            rabbitTemplate.convertAndSend(requestExchange, requestRoutingKey, requestMessage);
+
                             return promise;
                         }
 
-                        final CompletableFuture<DestroyVmResponse> promise = vmDeletionAsyncAcknowledgement
-                                .register(correlationId.toString());
-
-                        rabbitTemplate.convertAndSend(requestExchange, requestRoutingKey, requestMessage);
-
-                        return promise;
                     }
                 }
             }

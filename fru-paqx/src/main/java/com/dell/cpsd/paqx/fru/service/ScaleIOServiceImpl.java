@@ -7,10 +7,10 @@ package com.dell.cpsd.paqx.fru.service;
 
 import com.dell.cpsd.hdp.capability.registry.api.Capability;
 import com.dell.cpsd.hdp.capability.registry.client.CapabilityRegistryException;
-import com.dell.cpsd.hdp.capability.registry.client.ICapabilityRegistryLookupManager;
 import com.dell.cpsd.paqx.fru.amqp.consumer.handler.AsyncAcknowledgement;
 import com.dell.cpsd.paqx.fru.dto.ConsulRegistryResult;
 import com.dell.cpsd.paqx.fru.rest.dto.EndpointCredentials;
+import com.dell.cpsd.paqx.fru.rest.representation.HostRepresentation;
 import com.dell.cpsd.paqx.fru.valueobject.LongRunning;
 import com.dell.cpsd.service.common.client.exception.ServiceTimeoutException;
 import com.dell.cpsd.storage.capabilities.api.ConsulRegisterRequestMessage;
@@ -24,8 +24,6 @@ import com.dell.cpsd.storage.capabilities.api.SIONodeRemoveRequestMessage;
 import com.dell.cpsd.storage.capabilities.api.ScaleIOSystemDataRestRep;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.amqp.core.AmqpAdmin;
-import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -54,8 +52,9 @@ public class ScaleIOServiceImpl implements ScaleIOService
     private final AsyncAcknowledgement<OrderInfo>                scaleIORemoveAsyncAcknowledgement;
     private final AsyncAcknowledgement<ConsulRegistryResult>     consulRegistryResultAsyncAcknowledgement;
 
-    private final String     replyTo;
-    private final FruService fruService;
+    private final String      replyTo;
+    private final FruService  fruService;
+    private final DataService dataService;
 
     @Autowired
     public ScaleIOServiceImpl(final RabbitTemplate rabbitTemplate,
@@ -63,7 +62,7 @@ public class ScaleIOServiceImpl implements ScaleIOService
             @Qualifier(value = "scaleIOOrderAckResponseHandler") final AsyncAcknowledgement<OrderAckMessage> ackAsyncAcknowledgement,
             @Qualifier(value = "scaleIORemoveResponseHandler") final AsyncAcknowledgement<OrderInfo> scaleIORemoveAsyncAcknowledgement,
             @Qualifier(value = "coprHDConsulRegisterResponseHandler") final AsyncAcknowledgement<ConsulRegistryResult> consulRegistryResultAsyncAcknowledgement,
-            final String replyTo, final FruService fruService)
+            final String replyTo, final FruService fruService, final DataService dataService)
     {
         this.rabbitTemplate = rabbitTemplate;
         this.listStorageAsyncAcknowledgement = listStorageAsyncAcknowledgement;
@@ -72,6 +71,7 @@ public class ScaleIOServiceImpl implements ScaleIOService
         this.consulRegistryResultAsyncAcknowledgement = consulRegistryResultAsyncAcknowledgement;
         this.replyTo = replyTo;
         this.fruService = fruService;
+        this.dataService = dataService;
     }
 
     public CompletableFuture<ScaleIOSystemDataRestRep> listStorage(final EndpointCredentials scaleIOCredentials)
@@ -123,7 +123,7 @@ public class ScaleIOServiceImpl implements ScaleIOService
     }
 
     public LongRunning<OrderAckMessage, OrderInfo> sioNodeRemove(final EndpointCredentials scaleIOCredentials,
-            final EndpointCredentials scaleIOMDMCredentials)
+            final EndpointCredentials scaleIOMDMCredentials, final String jobId, final HostRepresentation hostRepresentation)
     {
         final String requiredCapability = "coprhd-sio-node-remove";
         try
@@ -139,7 +139,6 @@ public class ScaleIOServiceImpl implements ScaleIOService
 
             final Map<String, String> amqpProperties = fruService.declareBinding(matchedCapability, replyTo);
             final String correlationID = UUID.randomUUID().toString();
-            SIONodeRemoveRequestMessage requestMessage = new SIONodeRemoveRequestMessage();
 
             // Check data and form Message
             try
@@ -155,38 +154,13 @@ public class ScaleIOServiceImpl implements ScaleIOService
                 return new LongRunning<>(acknowledgementPromise, completionPromise);
             }
 
+            final SIONodeRemoveRequestMessage requestMessage = dataService
+                    .getSDSHostsToRemoveFromHostRepresentation(jobId, hostRepresentation, scaleIOCredentials.getEndpointUrl(),
+                            scaleIOMDMCredentials.getPassword(), scaleIOMDMCredentials.getUsername());
+            requestMessage.setMessageProperties(new MessageProperties(new Date(), correlationID, replyTo));
 
-            // Create default message data
-            // TODO: Get the data for the request message
-
-            SIONodeRemoveData sioNodeRemoveData = new SIONodeRemoveData();
-            sioNodeRemoveData.setScaleioInterface("eth0");
-            sioNodeRemoveData.setScaleioVolumeName("empty");
-
-            // Assumption about usr/password being same for MDM,SDS,SDC
-            final String USER = scaleIOMDMCredentials.getUsername();
-            final String PASSWORD = scaleIOMDMCredentials.getPassword();
-
-            // these IP addresses need to come from coprhd/vcenter correlation data set from some db or dto object
-            sioNodeRemoveData.setMdmHosts(
-                    "[{‘ip’:‘1.1.1.50’,‘user’:‘" + USER + "’,‘pass’:‘" + PASSWORD + "’},{‘ip’:‘1.1.1.51’,‘user’:‘" + USER
-                            + "’,‘pass’:‘" + PASSWORD + "’},{‘ip’:‘1.1.1.52’,‘user’:‘" + USER + "’,‘pass’:‘" + PASSWORD
-                            + "’}]");
-            sioNodeRemoveData.setSdcHosts("[{‘ip’:‘1.1.1.54’,‘user’:‘" + USER + "’,‘pass’:‘" + PASSWORD + "’}]");
-            sioNodeRemoveData.setSdsHosts("[]");
-
-            requestMessage.setSIONodeRemoveData(sioNodeRemoveData);
-            requestMessage.setApiPortNumber("4443");
-            requestMessage.setServicePortNumber("443");
-            // TODO: are these the right creds? SIO creds vs CoprHD creds
-            // Hard coded in coprhd client right now so these are not used
-            requestMessage.setPassword(scaleIOCredentials.getPassword());
-            requestMessage.setUserName(scaleIOCredentials.getUsername());
-
-            final CompletableFuture<OrderAckMessage> acknowledgementPromise = ackAsyncAcknowledgement
-                    .register(correlationID.toString());
-            final CompletableFuture<OrderInfo> completionPromise = scaleIORemoveAsyncAcknowledgement
-                    .register(correlationID.toString());
+            final CompletableFuture<OrderAckMessage> acknowledgementPromise = ackAsyncAcknowledgement.register(correlationID.toString());
+            final CompletableFuture<OrderInfo> completionPromise = scaleIORemoveAsyncAcknowledgement.register(correlationID.toString());
 
             final String requestExchange = amqpProperties.get("request-exchange");
             final String requestRoutingKey = amqpProperties.get("request-routing-key");

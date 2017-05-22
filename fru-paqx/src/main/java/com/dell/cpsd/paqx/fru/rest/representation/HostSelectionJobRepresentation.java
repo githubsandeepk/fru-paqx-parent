@@ -6,12 +6,13 @@ package com.dell.cpsd.paqx.fru.rest.representation;
 
 import com.dell.cpsd.paqx.fru.rest.domain.Job;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class HostSelectionJobRepresentation extends JobRepresentation
 {
 
-    private List<HostRepresentation> hostRepresentations;
+    private List<HostRepresentation> hostRepresentations = new ArrayList<>();
 
     public HostSelectionJobRepresentation(final Job job)
     {
