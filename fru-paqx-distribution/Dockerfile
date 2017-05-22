@@ -15,7 +15,7 @@ RUN mkdir -p ./bin \
 && mkdir -p ./logs \
 && mkdir -p ./lib \
 && mkdir -p ./install \
-&& mkdir -p ./conf \
+&& mkdir -p ./conf
 
 COPY target/dependency/lib/* ./lib/
 COPY build/conf/* ./conf/
