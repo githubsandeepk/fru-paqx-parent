@@ -38,31 +38,26 @@ pipeline {
                 sh "docker exec fru-paqx-test-${COMPOSE_PROJECT_NAME} mvn verify -DskipDocker=true -pl fru-paqx"
             }
         }
-	    stage('Package') {
-	        when {
+        stage('Test Packaging') {
+            when {
                 expression {
                     return !(env.BRANCH_NAME ==~ /master|develop|release\/.*/)
                 }
             }
 		    steps {
                 sh "mvn package -DskipTests=true -DskipITs"
+                archiveArtifacts artifacts: '**/*.rpm', fingerprint: true
             }
     	}
-        stage('Artifact') {
-            steps {
-               sh "mvn install -DskipTests=true -DskipITs -P buildDockerImageOnJenkins"
-               archiveArtifacts '**/*.rpm'
-            }
-        }
-        stage('Deploy') {
+        stage('Deploy & Artifact') {
 	        when {
                 expression {
                     return env.BRANCH_NAME ==~ /develop|release\/.*/
                 }
             }
             steps {
-                sh "mvn deploy -P buildDockerImageOnJenkins -DdockerImage.tag=api-gateway-parent-develop.${env.BUILD_NUMBER} -Ddocker.registry=docker-dev-local.art.local -DdeleteDockerImages=true -DskipTests=true -DskipITs"
-		        archiveArtifacts artifacts: '**/*.rpm', fingerprint: true
+                sh "mvn deploy -P buildDockerImageOnJenkins -DdockerImage.tag=fru-paqx-parent-develop.${env.BUILD_NUMBER} -Ddocker.registry=docker-dev-local.art.local -DdeleteDockerImages=true -DskipTests=true -DskipITs"
+                archiveArtifacts artifacts: '**/*.rpm', fingerprint: true
             }
         }
         stage('SonarQube Analysis') {
