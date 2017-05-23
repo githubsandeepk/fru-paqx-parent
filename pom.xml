@@ -50,6 +50,7 @@
         <plugin-jsonschema2pojo-version>0.4.34</plugin-jsonschema2pojo-version>
         <docker-maven-plugin-version>0.4.13</docker-maven-plugin-version>
         <spring-rabbit-test.version>1.7.0.RELEASE</spring-rabbit-test.version>
+        <system-sdk.version>0.0.1-SNAPSHOT</system-sdk.version>
     </properties>
 
     <modules>
@@ -77,6 +78,11 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter</artifactId>
                 <version>${spring-boot.version}</version>
+            </dependency>
+             <dependency>
+                <groupId>com.dell.cpsd.system.starter</groupId>
+				<artifactId>system-sdk</artifactId>
+				<version>${system-sdk.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

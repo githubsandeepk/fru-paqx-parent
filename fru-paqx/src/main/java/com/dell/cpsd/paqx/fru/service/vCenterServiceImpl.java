@@ -1,9 +1,29 @@
 /**
- * Copyright &copy; 2017 Dell Inc. or its subsidiaries.  All Rights Reserved.
- * Dell EMC Confidential/Proprietary Information
+ * Copyright &copy; 2017 Dell Inc. or its subsidiaries. All Rights Reserved. Dell EMC Confidential/Proprietary Information
  */
 
 package com.dell.cpsd.paqx.fru.service;
+
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.AmqpAdmin;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
 
 import com.dell.cpsd.hdp.capability.registry.api.Capability;
 import com.dell.cpsd.hdp.capability.registry.api.CapabilityProvider;
@@ -20,6 +40,8 @@ import com.dell.cpsd.paqx.fru.rest.dto.vcenter.ClusterOperationResponse;
 import com.dell.cpsd.paqx.fru.rest.dto.vcenter.DestroyVmResponse;
 import com.dell.cpsd.paqx.fru.rest.dto.vcenter.HostMaintenanceModeResponse;
 import com.dell.cpsd.paqx.fru.rest.representation.HostRepresentation;
+import com.dell.cpsd.sdk.client.CapabilityService;
+import com.dell.cpsd.sdk.exceptions.CapabilityRetrievalException;
 import com.dell.cpsd.service.common.client.exception.ServiceTimeoutException;
 import com.dell.cpsd.virtualization.capabilities.api.ClusterOperationRequest;
 import com.dell.cpsd.virtualization.capabilities.api.ClusterOperationRequestMessage;
@@ -33,35 +55,14 @@ import com.dell.cpsd.virtualization.capabilities.api.MaintenanceModeRequest;
 import com.dell.cpsd.virtualization.capabilities.api.MessageProperties;
 import com.dell.cpsd.virtualization.capabilities.api.PowerOperationRequest;
 import com.dell.cpsd.virtualization.capabilities.api.RegistrationInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.amqp.core.AmqpAdmin;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.TopicExchange;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
-
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
- * Copyright &copy; 2017 Dell Inc. or its subsidiaries.  All Rights Reserved.
- * Dell EMC Confidential/Proprietary Information
+ * Copyright &copy; 2017 Dell Inc. or its subsidiaries. All Rights Reserved. Dell EMC Confidential/Proprietary Information
  */
 @Service
 public class vCenterServiceImpl implements vCenterService
 {
-    private static final Logger LOG = LoggerFactory.getLogger(vCenterServiceImpl.class);
+    private static final Logger                    LOG = LoggerFactory.getLogger(vCenterServiceImpl.class);
 
     private final ICapabilityRegistryLookupManager capabilityRegistryLookupManager;
     private final RabbitTemplate                   rabbitTemplate;
@@ -76,6 +77,7 @@ public class vCenterServiceImpl implements vCenterService
     private final String                           replyTo;
     private final FruService                       fruService;
     private final DataService                      dataService;
+    private final CapabilityService                capabilityService;
 
     @Autowired
     public vCenterServiceImpl(final ICapabilityRegistryLookupManager capabilityRegistryLookupManager, final RabbitTemplate rabbitTemplate,
@@ -86,7 +88,8 @@ public class vCenterServiceImpl implements vCenterService
             @Qualifier(value = "vCenterHostPowerOperationResponseHandler") final AsyncAcknowledgement vCenterHostPowerAsyncAcknowledgement,
             @Qualifier(value = "vCenterHostMaintenanceModeResponseHandler") final AsyncAcknowledgement hostMaintenanceModeAsyncAcknowledgement,
             @Qualifier(value = "vCenterClusterOperationsResponseHandler") final AsyncAcknowledgement vcenterClusterOperationAsyncAcknowledgement,
-            @Qualifier(value = "replyTo") final String replyTo, final FruService fruService, final DataService dataService)
+            @Qualifier(value = "replyTo") final String replyTo, final FruService fruService, final DataService dataService,
+            final CapabilityService capabilityService)
     {
         this.capabilityRegistryLookupManager = capabilityRegistryLookupManager;
         this.rabbitTemplate = rabbitTemplate;
@@ -101,6 +104,7 @@ public class vCenterServiceImpl implements vCenterService
         this.replyTo = replyTo;
         this.fruService = fruService;
         this.dataService = dataService;
+        this.capabilityService = capabilityService;
     }
 
     public CompletableFuture<vCenterSystemProperties> showSystem(final EndpointCredentials vcenterCredentials)
@@ -108,7 +112,7 @@ public class vCenterServiceImpl implements vCenterService
         final String requiredCapability = "vcenter-discover";
 
         try
-        {
+        {   capabilityService.getCapability(requiredCapability);
             final List<Capability> matchedCapabilities = fruService.findMatchingCapabilities(requiredCapability);
             if (matchedCapabilities.isEmpty())
             {
@@ -118,17 +122,18 @@ public class vCenterServiceImpl implements vCenterService
             final Capability matchedCapability = matchedCapabilities.stream().findFirst().get();
             LOG.debug("Found capability {}", matchedCapability.getProfile());
 
-            //TODO: Work in progress
+            // TODO: Work in progress
             final Map<String, String> amqpProperties = fruService.declareBinding(matchedCapability, replyTo);
             final String correlationID = UUID.randomUUID().toString();
         }
-        catch (ServiceTimeoutException | CapabilityRegistryException e)
+        catch (ServiceTimeoutException | CapabilityRegistryException | CapabilityRetrievalException e)
         {
             return null;
         }
 
         try
         {
+            
             final ListCapabilityProvidersResponse listCapabilityProvidersResponse = capabilityRegistryLookupManager
                     .listCapabilityProviders(TimeUnit.SECONDS.toMillis(5));
 
@@ -157,9 +162,8 @@ public class vCenterServiceImpl implements vCenterService
 
                         final UUID correlationId = UUID.randomUUID();
                         DiscoveryRequestInfoMessage requestMessage = new DiscoveryRequestInfoMessage();
-                        requestMessage.setMessageProperties(
-                                new MessageProperties().withCorrelationId(correlationId.toString()).withReplyTo(replyTo)
-                                        .withTimestamp(new Date()));
+                        requestMessage.setMessageProperties(new MessageProperties().withCorrelationId(correlationId.toString())
+                                .withReplyTo(replyTo).withTimestamp(new Date()));
 
                         try
                         {
@@ -233,9 +237,8 @@ public class vCenterServiceImpl implements vCenterService
 
                         final UUID correlationId = UUID.randomUUID();
                         ConsulRegisterRequestMessage requestMessage = new ConsulRegisterRequestMessage();
-                        requestMessage.setMessageProperties(
-                                new MessageProperties().withCorrelationId(correlationId.toString()).withReplyTo(replyTo)
-                                        .withTimestamp(new Date()));
+                        requestMessage.setMessageProperties(new MessageProperties().withCorrelationId(correlationId.toString())
+                                .withReplyTo(replyTo).withTimestamp(new Date()));
 
                         try
                         {
@@ -309,10 +312,10 @@ public class vCenterServiceImpl implements vCenterService
 
                         final UUID correlationId = UUID.randomUUID();
 
-                        //TODO: Do we need a list. If list, so should we send all of them.
-                        final List<DestroyVMRequestMessage> requestMessages = dataService
-                                .getDestroyVMRequestMessage(jobId, hostRepresentation, vcenterCredentials.getEndpointUrl(),
-                                        vcenterCredentials.getPassword(), vcenterCredentials.getUsername());
+                        // TODO: Do we need a list. If list, so should we send all of them.
+                        final List<DestroyVMRequestMessage> requestMessages = dataService.getDestroyVMRequestMessage(jobId,
+                                hostRepresentation, vcenterCredentials.getEndpointUrl(), vcenterCredentials.getPassword(),
+                                vcenterCredentials.getUsername());
 
                         if (requestMessages != null && !requestMessages.isEmpty())
                         {
@@ -473,9 +476,8 @@ public class vCenterServiceImpl implements vCenterService
 
                         final UUID correlationId = UUID.randomUUID();
                         HostPowerOperationRequestMessage requestMessage = new HostPowerOperationRequestMessage();
-                        requestMessage.setMessageProperties(
-                                new MessageProperties().withCorrelationId(correlationId.toString()).withReplyTo(replyTo)
-                                        .withTimestamp(new Date()));
+                        requestMessage.setMessageProperties(new MessageProperties().withCorrelationId(correlationId.toString())
+                                .withReplyTo(replyTo).withTimestamp(new Date()));
 
                         try
                         {
@@ -492,7 +494,7 @@ public class vCenterServiceImpl implements vCenterService
                                 vcenterCredentials.getPassword(), vcenterCredentials.getUsername());
                         requestMessage.setCredentials(credentials);
 
-                        //TODO hostname is blank BUT SHOULD be filled with appropriate data
+                        // TODO hostname is blank BUT SHOULD be filled with appropriate data
                         PowerOperationRequest powerOperationRequest = new PowerOperationRequest(hostname,
                                 PowerOperationRequest.PowerOperation.POWER_OFF);
 
@@ -559,7 +561,7 @@ public class vCenterServiceImpl implements vCenterService
                                 vcenterCredentials.getUsername()));
                         final ClusterOperationRequest clusterOperationRequest = new ClusterOperationRequest();
                         clusterOperationRequest.setHostName(hostname);
-                        //TODO: If not required remove the cluster id
+                        // TODO: If not required remove the cluster id
                         clusterOperationRequest.setClusterID(clusterId);
                         clusterOperationRequest.setClusterOperation(ClusterOperationRequest.ClusterOperation.REMOVE_HOST);
                         requestMessage.setClusterOperationRequest(clusterOperationRequest);
